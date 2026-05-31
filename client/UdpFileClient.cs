@@ -42,19 +42,17 @@ public class UdpFileClient
         byte[] resp = controlSocket.Receive(ref fromEP);
         string reply = Encoding.ASCII.GetString(resp).Trim();
 
-        if (reply == $"ERR {filename} NOT_FOUND")
-        {
+        if (reply == $"ERR {filename} NOT_FOUND") {
             Console.WriteLine(reply);
             return;
         }
 
-        int sizeStart = reply.IndexOf("SIZE ") + 5;
-        int sizeEnd = reply.IndexOf(" PORT");
-        int fileSize = int.Parse(reply.Substring(sizeStart, sizeEnd - sizeStart));
+        int startWord = reply.IndexOf("SIZE ") + 5;
+        int endWord = reply.IndexOf(" PORT");
+        int fileSize = int.Parse(reply.Substring(startWord, endWord - startWord));
 
-        int portStart = reply.IndexOf("PORT ") + 5;
-        int transferPort = int.Parse(reply.Substring(portStart));
-
+        startWord = reply.IndexOf("PORT ") + 5;
+        int transferPort = int.Parse(reply.Substring(startWord));
 
         UdpClient dataSocket = new UdpClient();
         IPEndPoint dataEP = new IPEndPoint(IPAddress.Parse(host), transferPort);
@@ -78,37 +76,33 @@ public class UdpFileClient
                 dataSocket.Send(getBytes, getBytes.Length, dataEP);
                 dataSocket.Client.ReceiveTimeout = (attempt + 1) * 1000;
 
-                try
-                {
+                try {
                     IPEndPoint replyEP = new IPEndPoint(IPAddress.Any, 0);
                     byte[] chunkBytes = dataSocket.Receive(ref replyEP);
                     dataEP = replyEP;
                     chunkReply = Encoding.ASCII.GetString(chunkBytes).Trim();
                     break;
                 }
-                catch (SocketException)
-                {
+                catch (SocketException) {
                     DrainSocket(dataSocket);
                 }
             }
 
-            if (chunkReply == null)
-            {
+            if (chunkReply == null) {
                 Console.WriteLine($"\nERROR {filename} timeout");
                 dataSocket.Close();
                 return;
             }
 
-            int dataStart = chunkReply.IndexOf(" DATA ") + 6;
-            string encoded = chunkReply.Substring(dataStart);
+            startWord = chunkReply.IndexOf(" DATA ") + 6;
+            string encoded = chunkReply.Substring(startWord);
             byte[] chunk = Convert.FromBase64String(encoded);
             Array.Copy(chunk, 0, buffer, position, chunk.Length);
 
             position = end + 1;
 
             int percent = (int)((float)position / fileSize * 100);
-            if (percent != lastPercent)
-            {
+            if (percent != lastPercent) {
                 Console.Write($"\r{filename} {percent}%");
                 lastPercent = percent;
             }
@@ -120,12 +114,11 @@ public class UdpFileClient
         byte[] closeMsg = Encoding.ASCII.GetBytes($"FILE {filename} CLOSE");
         dataSocket.Send(closeMsg, closeMsg.Length, dataEP);
 
-        try
-        {
+        try {
             IPEndPoint replyEP = new IPEndPoint(IPAddress.Any, 0);
             dataSocket.Receive(ref replyEP);
         }
-        catch (SocketException){}
+        catch (SocketException) { }
 
         File.WriteAllBytes(filename, buffer);
         Console.WriteLine($"OK {filename}");
@@ -137,8 +130,7 @@ public class UdpFileClient
         int saved = socket.Client.ReceiveTimeout;
         socket.Client.ReceiveTimeout = 1;
         IPEndPoint ep = new IPEndPoint(IPAddress.Any, 0);
-        try
-        {
+        try {
             while (true) socket.Receive(ref ep);
         }
         catch (SocketException) { }

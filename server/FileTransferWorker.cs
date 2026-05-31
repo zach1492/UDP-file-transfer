@@ -45,8 +45,7 @@ public class FileTransferWorker
             byte[] bytes = job.TransferSocket.Receive(ref remoteEP);
             string message = Encoding.ASCII.GetString(bytes).Trim();
 
-            if (message == $"FILE {filename} CLOSE")
-            {
+            if (message == $"FILE {filename} CLOSE") {
                 byte[] closeBytes = Encoding.ASCII.GetBytes($"FILE {filename} CLOSE_OK");
                 job.TransferSocket.Send(closeBytes, closeBytes.Length, remoteEP);
                 job.TransferSocket.Close();
@@ -60,8 +59,8 @@ public class FileTransferWorker
             startWord = message.IndexOf(" END ") + 5;
             int endIndex = int.Parse(message.Substring(startWord));
 
-            int chunkLen = endIndex - startIndex + 1;
-            string encodedData = Convert.ToBase64String(fileBytes, startIndex, chunkLen);
+            int cLength = endIndex - startIndex + 1;
+            string encodedData = Convert.ToBase64String(fileBytes, startIndex, cLength);
 
             byte[] replyBytes = Encoding.ASCII.GetBytes($"FILE {filename} OK START {startIndex} END {endIndex} DATA {encodedData}");
             job.TransferSocket.Send(replyBytes, replyBytes.Length, remoteEP);
