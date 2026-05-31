@@ -123,7 +123,7 @@ public class UdpFileClient
         try
         {
             IPEndPoint replyEP = new IPEndPoint(IPAddress.Any, 0);
-            byte[] closeResp = dataSocket.Receive(ref replyEP);
+            dataSocket.Receive(ref replyEP);
         }
         catch (SocketException){}
 

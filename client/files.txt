@@ -1,3 +1,4 @@
 test_one.txt
 dog.jpeg
 fake_file.txt
+fake.txt
