@@ -1,7 +1,8 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Net.IO
+using System.Text;
 
 public class FileTransferWorker
 {
@@ -19,50 +20,58 @@ public class FileTransferWorker
         }
     }
 
-    // Implement Run — see assignment specification
-    // (Job: Filename, ClientEndpoint, TransferSocket).
     public static void Run(object jobObject)
     {
-        string message = $"ERR {filename} NOT_FOUND";
+        Job job = (Job)jobObject;
+        string filename = job.Filename;
+        string filepath = UdpFileServer.FilePath(filename); 
 
-        if(!file.Exists(filename)){
-            SendControlReply(ClientEndpoint, message);
-            socket.Shutdown(SocketShutdown.Send)
-            transferSocket.close();
-            
+        if (!File.Exists(filepath))
+        {
+            string message = "ERR " + filename + " NOT_FOUND";
+            UdpFileServer.SendControlReply(job.ClientEndpoint, message); 
+            job.TransferSocket.Close();
+            return;
         }
-        else{
-            p = PublicPort(job.TransferSocket)
-            message = $"OK {filename} SIZE {new FileInfo(path).Length} PORT {p/*IPEndPoint*/} ";
+        else
+        {
+            byte[] fileBytes = File.ReadAllBytes(filepath);
+            int p = UdpFileServer.PublicPort(job.TransferSocket);
+            string okMsg = "OK " + filename + " SIZE " + fileBytes.Length + " PORT " + p;
 
-            byte[] bytes = Encoding.ASCII.GetBytes(message);
+            UdpFileServer.SendControlReply(job.ClientEndpoint, okMsg);
 
-            job.transferSocket.send(bytes, bytes.Length, 0, SocketFlags.None);
+            job.TransferSocket.Client.ReceiveTimeout = 30000;
+            IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
 
-            while(true){
-                byte[] bytes = transferSocket.Receive(ref groupEP);
+            while (true)
+            {
+                byte[] bytes = job.TransferSocket.Receive(ref remoteEP);
+                string message = Encoding.ASCII.GetString(bytes).Trim();
 
-                string message = Encoding.ASCII.GetString(bytes);
+                if (message == "FILE " + filename + " CLOSE")
+                {
+                    string response = "FILE " + filename + " CLOSE_OK";
+                    byte[] closeBytes = Encoding.ASCII.GetBytes(response);
+                    job.TransferSocket.Send(closeBytes, closeBytes.Length, remoteEP);
+                    job.TransferSocket.Close();
+                    return;
+                }
 
-                int startWord = message.IndexOf("FILE ") + 5;
-                int endWord = message.IndexOf(" GET");
-
-                string fileName = message.Substring(startWord, endWord - startWord);
-
-                startWord = message.IndexOf("START ") + 6;
-                endWord = message.IndexOf(" END");
-
+                int startWord = message.IndexOf("START ") + 6;
+                int endWord = message.IndexOf(" END");
                 int startIndex = int.Parse(message.Substring(startWord, endWord - startWord));
 
-                startWord = message.IndexOf(" END") + 4;
+                startWord = message.IndexOf(" END ") + 5;
+                int endIndex = int.Parse(message.Substring(startWord));
 
-                int endIndex = int.Parse(message.Substring(startWord, message.Length - startWord));
+                int chunkLen = endIndex - startIndex + 1;
+                string encodedData = Convert.ToBase64String(fileBytes, startIndex, chunkLen);
 
-                string file = File.ReadAllLines(fileName);
+                string reply = "FILE " + filename + " OK START " + startIndex + " END " + endIndex + " DATA " + encodedData;
+                byte[] replyBytes = Encoding.ASCII.GetBytes(reply);
 
-                int length = endIndex - startIndex 
-
-                file = file.Substring(startIndex, length);
+                job.TransferSocket.Send(replyBytes, replyBytes.Length, remoteEP);
             }
         }
     }

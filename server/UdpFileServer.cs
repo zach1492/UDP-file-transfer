@@ -5,10 +5,9 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
-// Provided — keep for building; do not submit or replace. Receives DOWNLOAD and starts FileTransferWorker per request.
 public class UdpFileServer
 {
-    public const string FileDirectory = "files"; // spec: server/files/<name>
+    public const string FileDirectory = "files";
 
     private static readonly object controlSendLock = new object();
     private static UdpClient listener;
@@ -18,7 +17,6 @@ public class UdpFileServer
         return Path.Combine(FileDirectory, filename);
     }
 
-    // PORT in OK is the bound transfer socket port.
     public static int PublicPort(UdpClient socket)
     {
         return ((IPEndPoint)socket.Client.LocalEndPoint).Port;
@@ -59,14 +57,13 @@ public class UdpFileServer
             }
 
             Console.WriteLine("Accepted DOWNLOAD for " + filename + " from " + client);
-            UdpClient transferSocket = new UdpClient(0); // one data socket per transfer
+            UdpClient transferSocket = new UdpClient(0); 
             Thread worker = new Thread(FileTransferWorker.Run);
             worker.IsBackground = true;
             worker.Start(new FileTransferWorker.Job(filename, client, transferSocket));
         }
     }
 
-    // OK and ERR go out on the control (listener) port.
     public static void SendControlReply(IPEndPoint client, string message)
     {
         byte[] bytes = Encoding.ASCII.GetBytes(message);
